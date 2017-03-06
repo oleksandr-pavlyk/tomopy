@@ -58,6 +58,8 @@
     #define M_PI 3.14159265359
 #endif
 
+#define __LIKELY(x) __builtin_expect(!!(x), 1)
+
 void 
 gridrec(
     const float *data, int dy, int dt, int dx, const float *center, 
@@ -85,17 +87,18 @@ gridrec(
     // Compute pdim = next power of 2 >= dx
     for(pdim = 16; pdim < dx; pdim *= 2);
 
-    const int M02 = pdim/2-1;
+    const int pdim2 = pdim >> 1;
+    const int M02 = pdim2 - 1;
 
     unsigned char filter2d = filter_is_2d(fname);
 
     // Allocate storage for various arrays.
     sino = malloc_vector_c(pdim);
     if(!filter2d){
-        filphase = malloc_vector_c(pdim/2);
+        filphase = malloc_vector_c(pdim2);
         filphase_iter = filphase;
     }else{
-        filphase = malloc_vector_c(dt*(pdim/2));
+        filphase = malloc_vector_c(dt*(pdim2));
     }
     H = malloc_matrix_c(pdim, pdim);
     wtbl = malloc_vector_f(ltbl+1);
@@ -177,8 +180,7 @@ gridrec(
         const float L2 = (int)(C/M_PI);
         const float tblspcg = 2*ltbl/L;
 
-        const int pdim2 = pdim >> 1;
-        const int M2 = pdim >> 1;
+        const int M2 = pdim2;
         int iul, iuh, ivl, ivh;
         int j, k;
 
@@ -192,7 +194,7 @@ gridrec(
                     // Add data from both slices
                     float second_sino = 0.0;
                     const unsigned int index = j+p*dx+s*dx*dt;
-                    if ((s + 1) < dy)
+                    if (__LIKELY((s + 1) < dy))
                     {
                         second_sino = data[index + dx*dt];
                     }
@@ -232,13 +234,19 @@ gridrec(
                 if(ivh>=pdim) ivh = pdim-1; 
 
                 // Note aliasing value (at index=0) is forced to zero.
+#ifdef __INTEL_COMPILER
+		#pragma ivdep
+#endif
                 for(iv=ivl, k=0; iv<=ivh; iv++, k++) {
-                    work[k] = wtbl[lroundf(fabs(V-iv)*tblspcg)];
+                    work[k] = wtbl[(int) roundf(fabsf(V-iv)*tblspcg)];
                 }
-                    
+
+#ifdef __INTEL_COMPILER
+		#pragma ivdep
+#endif
                 for(iu=iul; iu<=iuh; iu++)
                 {
-                    rtmp = wtbl[lroundf(fabs(U-iu)*tblspcg)];
+                    rtmp = wtbl[(int) roundf(fabsf(U-iu)*tblspcg)];
                     for(iv=ivl, k=0; iv<=ivh; iv++, k++)
                     {
                         const float convolv = rtmp*work[k];
@@ -319,7 +327,7 @@ gridrec(
                     {
                         const float corrn = corrn_u*winv[k+padx];
                         recon[islc1+ngridy*(ngridx-1-k)+j] = corrn*crealf(H[iu][iv]);
-                        if((s+1) < dy)
+                        if(__LIKELY((s+1) < dy))
                         {
                             recon[islc2+ngridy*(ngridx-1-k)+j] = corrn*cimagf(H[iu][iv]);
                         }
@@ -417,13 +425,16 @@ set_pswf_tables(
     norm = sqrt(M_PI/2/C/lambda) / 1.2;
 
     winv[linv] = norm / wtbl[0];
+#ifdef __INTEL_COMPILER
+    #pragma ivdep
+#endif
     for(i=1; i<=linv; i++)
     {
         // Minus sign for alternate entries
         // corrects for "natural" data layout
         // in array H at end of Phase 1.
         norm = -norm; 
-        winv[linv+i] = winv[linv-i] = norm / wtbl[lroundf(i*fac)];
+        winv[linv+i] = winv[linv-i] = norm / wtbl[(int) roundf(i*fac)];
     }
 }
 
@@ -451,17 +462,19 @@ legendre(int n, const float *coefs, float x)
     // Compute SUM(coefs(k)*P(2*k,x), for k=0,n/2)
     // where P(j,x) is the jth Legendre polynomial.
     // x must be between -1 and 1.
-    float penult, last, cur, y;
+    float penult, last, cur, y, mxlast;
 
     y = coefs[0];
     penult = 1.0;
     last = x;
     for(int j=2; j<=n; j++)
     {
-        cur = (x*(2*j-1)*last-(j-1)*penult)/j;
+	mxlast = -(x*last);
+	cur = -(2*mxlast + penult) + (penult + mxlast)/j;
+        // cur = (x*(2*j-1)*last-(j-1)*penult)/j;
         if(!(j&1)) // if j is even
         {
-            y += cur*coefs[j/2];
+            y += cur*coefs[j >> 1];
         } 
 
         penult = last;
@@ -470,25 +483,25 @@ legendre(int n, const float *coefs, float x)
     return y;
 }
 
-float*
+inline float*
 malloc_vector_f(size_t n) 
 {
     return fftwf_alloc_real(n);
 }
 
-void
+inline void
 free_vector_f(float* v)
 {
     fftwf_free(v);
 }
 
-float _Complex*
+inline float _Complex*
 malloc_vector_c(size_t n) 
 {
     return fftwf_alloc_complex(n);
 }
 
-void
+inline void
 free_vector_c(float _Complex* v)
 {
     fftwf_free(v);
@@ -514,7 +527,7 @@ malloc_matrix_c(size_t nr, size_t nc)
     return m;
 }
 
-void
+inline void
 free_matrix_c(float _Complex** m)
 {
     free_vector_c(m[0]);
@@ -522,75 +535,75 @@ free_matrix_c(float _Complex** m)
 }
 
 // No filter
-float 
+inline float 
 filter_none(float x, int i, int j, int fwidth, const float* pars)
 {
-    return 1;
+    return 1.0;
 }
 
 
 // Shepp-Logan filter
-float 
+inline float
 filter_shepp(float x, int i, int j, int fwidth, const float* pars)
 {
-    if(i==0) return 0;
-    return fabs(2*x)*(sinf(M_PI*x)/(M_PI*x));
+    if(i==0) return 0.0;
+    return fabsf(2*x)*(sinf(M_PI*x)/(M_PI*x));
 }
 
 
 // Cosine filter 
-float 
+inline float
 filter_cosine(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x)*(cosf(M_PI*x));
+    return fabsf(2*x)*(cosf(M_PI*x));
 }
 
 
 // Hann filter 
-float 
+inline float
 filter_hann(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x)*0.5*(1.+cosf(2*M_PI*x/pars[0]));
+    return fabsf(2*x)*0.5*(1.+cosf(2*M_PI*x/pars[0]));
 }
 
 
 // Hamming filter 
-float 
+inline float
 filter_hamming(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x)*(0.54+0.46*cosf(2*M_PI*x/pars[0]));
+    return fabsf(2*x)*(0.54+0.46*cosf(2*M_PI*x/pars[0]));
 }
 
 // Ramlak filter
-float 
+inline float
 filter_ramlak(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x);
+    return fabsf(2*x);
 }
 
 // Parzen filter
-float 
+inline float
 filter_parzen(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x)*pow(1-fabs(x)/pars[0], 3);
+    return fabsf(2*x)*pow(1-fabs(x)/pars[0], 3);
 }
 
 // Butterworth filter
-float 
+inline float
 filter_butterworth(float x, int i, int j, int fwidth, const float* pars)
 {
-    return fabs(2*x)/(1+pow(x/pars[0], 2*pars[1]));
+    return fabsf(2*x)/(1+pow(x/pars[0], 2*pars[1]));
 }
 
 // Custom filter
-float 
+inline float
 filter_custom(float x, int i, int j, int fwidth, const float* pars)
 {
     return pars[i];
 }
 
 // Custom 2D filter
-float 
+inline float
 filter_custom2d(float x, int i, int j, int fwidth, const float* pars)
 {
     return pars[j*fwidth+i];
@@ -626,7 +639,7 @@ float (*get_filter(const char *name))(float, int, int, int, const float*)
     return fltbl[1].fp;   
 }
 
-unsigned char
+inline unsigned char
 filter_is_2d(const char *name)
 {
     if(!strncmp(name, "custom2d", 16)) return 1;
