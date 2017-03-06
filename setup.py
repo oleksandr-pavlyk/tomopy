@@ -17,7 +17,7 @@ else:
     C_INCLUDE_PATH = C_INCLUDE_PATH.split(':')
 
 extra_comp_args = ['-std=c99']
-extra_link_args = ['-lm']
+extra_link_args = [] # do not add -lm for better code on KNL
 if os.name == 'nt':
     extra_comp_args += ['-DWIN32']
     extra_link_args += ['-lfftw3f-3']
