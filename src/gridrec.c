@@ -483,25 +483,25 @@ legendre(int n, const float *coefs, float x)
     return y;
 }
 
-inline float*
+float*
 malloc_vector_f(size_t n) 
 {
     return fftwf_alloc_real(n);
 }
 
-inline void
+void
 free_vector_f(float* v)
 {
     fftwf_free(v);
 }
 
-inline float _Complex*
+float _Complex*
 malloc_vector_c(size_t n) 
 {
     return fftwf_alloc_complex(n);
 }
 
-inline void
+void
 free_vector_c(float _Complex* v)
 {
     fftwf_free(v);
@@ -527,7 +527,7 @@ malloc_matrix_c(size_t nr, size_t nc)
     return m;
 }
 
-inline void
+void
 free_matrix_c(float _Complex** m)
 {
     free_vector_c(m[0]);
@@ -535,7 +535,7 @@ free_matrix_c(float _Complex** m)
 }
 
 // No filter
-inline float 
+float 
 filter_none(float x, int i, int j, int fwidth, const float* pars)
 {
     return 1.0;
@@ -543,7 +543,7 @@ filter_none(float x, int i, int j, int fwidth, const float* pars)
 
 
 // Shepp-Logan filter
-inline float
+float
 filter_shepp(float x, int i, int j, int fwidth, const float* pars)
 {
     if(i==0) return 0.0;
@@ -552,7 +552,7 @@ filter_shepp(float x, int i, int j, int fwidth, const float* pars)
 
 
 // Cosine filter 
-inline float
+float
 filter_cosine(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x)*(cosf(M_PI*x));
@@ -560,7 +560,7 @@ filter_cosine(float x, int i, int j, int fwidth, const float* pars)
 
 
 // Hann filter 
-inline float
+float
 filter_hann(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x)*0.5*(1.+cosf(2*M_PI*x/pars[0]));
@@ -568,42 +568,42 @@ filter_hann(float x, int i, int j, int fwidth, const float* pars)
 
 
 // Hamming filter 
-inline float
+float
 filter_hamming(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x)*(0.54+0.46*cosf(2*M_PI*x/pars[0]));
 }
 
 // Ramlak filter
-inline float
+float
 filter_ramlak(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x);
 }
 
 // Parzen filter
-inline float
+float
 filter_parzen(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x)*pow(1-fabs(x)/pars[0], 3);
 }
 
 // Butterworth filter
-inline float
+float
 filter_butterworth(float x, int i, int j, int fwidth, const float* pars)
 {
     return fabsf(2*x)/(1+pow(x/pars[0], 2*pars[1]));
 }
 
 // Custom filter
-inline float
+float
 filter_custom(float x, int i, int j, int fwidth, const float* pars)
 {
     return pars[i];
 }
 
 // Custom 2D filter
-inline float
+float
 filter_custom2d(float x, int i, int j, int fwidth, const float* pars)
 {
     return pars[j*fwidth+i];
@@ -639,7 +639,7 @@ float (*get_filter(const char *name))(float, int, int, int, const float*)
     return fltbl[1].fp;   
 }
 
-inline unsigned char
+unsigned char
 filter_is_2d(const char *name)
 {
     if(!strncmp(name, "custom2d", 16)) return 1;

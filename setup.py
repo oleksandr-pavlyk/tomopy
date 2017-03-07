@@ -57,7 +57,7 @@ if on_rtd:
 
 setup(
     name='tomopy',
-    packages=find_packages(exclude=['test*']),
+    packages=find_packages(exclude=['test*', 'doc*']),
     version=open('VERSION').read().strip(),
     include_package_data=True,
     ext_modules=ext_mods,
