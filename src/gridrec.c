@@ -124,13 +124,7 @@ gridrec(
         set_filter_tables(dt, pdim, center[s], filter, filter_par, filphase, filter2d);
 
         // First clear the array H
-        for(iu=0; iu<pdim; iu++) 
-        {
-            for(iv=0; iv<pdim; iv++)
-            {
-                H[iu][iv] = 0.0;
-            }
-        }
+        memset(H, pdim * pdim * sizeof(H[0][0]), 0);
 
         // Loop over the dt projection angles. For each angle, do the following:
 
@@ -181,7 +175,7 @@ gridrec(
         const float tblspcg = 2*ltbl/L;
 
         const int M2 = pdim2;
-        int iul, iuh, ivl, ivh;
+        int iul, iuh, iuh2, ivl, ivh;
         int j, k;
 
         // For each projection
@@ -215,7 +209,7 @@ gridrec(
 
             // For each FFT(projection)
             for(j=1; j<pdim2; j++)
-            {    
+            {
                 Cdata1 = filphase_iter[j] * sino[j];
                 Cdata2 = conjf(filphase_iter[j]) * sino[pdim-j];
 
@@ -224,27 +218,48 @@ gridrec(
 
                 // Note freq space origin is at (M2,M2), but we
                 // offset the indices U, V, etc. to range from 0 to M-1.
-                iul = ceil(U-L2);
-                iuh = floor(U+L2);
-                ivl = ceil(V-L2); 
-                ivh = floor(V+L2);
+                iul = ceilf(U-L2);
+                iuh = floorf(U+L2);
+                ivl = ceilf(V-L2);
+                ivh = floorf(V+L2);
                 if(iul<1) iul = 1;
                 if(iuh>=pdim) iuh = pdim-1; 
                 if(ivl<1) ivl = 1; 
                 if(ivh>=pdim) ivh = pdim-1; 
 
                 // Note aliasing value (at index=0) is forced to zero.
-#ifdef __INTEL_COMPILER
-		#pragma ivdep
-#endif
+		 #pragma simd assert
                 for(iv=ivl, k=0; iv<=ivh; iv++, k++) {
                     work[k] = wtbl[(int) roundf(fabsf(V-iv)*tblspcg)];
                 }
 
-#ifdef __INTEL_COMPILER
-		#pragma ivdep
-#endif
-                for(iu=iul; iu<=iuh; iu++)
+                iuh2 = (pdim2 > iuh) ? iuh : pdim2 - 1;
+		 #pragma simd assert
+                for(iu=iul; iu <= iuh2; iu++)
+                {
+                    rtmp = wtbl[(int) roundf(fabsf(U-iu)*tblspcg)];
+                    for(iv=ivl, k=0; iv<=ivh; iv++, k++)
+                    {
+                        const float convolv = rtmp*work[k];
+                        H[iu][iv] += convolv*Cdata1;
+                        H[pdim-iu][pdim-iv] += convolv*Cdata2;
+                    }
+                }
+
+                // assert( iu == pdim2 || iu > iuh );
+                for( ; iu <= pdim2 && iu <= iuh; iu++)
+                {
+                    rtmp = wtbl[(int) roundf(fabsf(U-iu)*tblspcg)];
+                    for(iv=ivl, k=0; iv<=ivh; iv++, k++)
+                    {
+                        const float convolv = rtmp*work[k];
+                        H[iu][iv] += convolv*Cdata1;
+                        H[pdim-iu][pdim-iv] += convolv*Cdata2;
+                    }
+                }
+
+		 #pragma simd assert
+                for(; iu<=iuh; iu++)
                 {
                     rtmp = wtbl[(int) roundf(fabsf(U-iu)*tblspcg)];
                     for(iv=ivl, k=0; iv<=ivh; iv++, k++)
@@ -425,9 +440,7 @@ set_pswf_tables(
     norm = sqrt(M_PI/2/C/lambda) / 1.2;
 
     winv[linv] = norm / wtbl[0];
-#ifdef __INTEL_COMPILER
     #pragma ivdep
-#endif
     for(i=1; i<=linv; i++)
     {
         // Minus sign for alternate entries
