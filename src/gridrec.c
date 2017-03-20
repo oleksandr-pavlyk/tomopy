@@ -124,7 +124,7 @@ gridrec(
         set_filter_tables(dt, pdim, center[s], filter, filter_par, filphase, filter2d);
 
         // First clear the array H
-        memset(H, pdim * pdim * sizeof(H[0][0]), 0);
+        memset(H, 0, pdim * pdim * sizeof(H[0][0]));
 
         // Loop over the dt projection angles. For each angle, do the following:
 
