@@ -506,25 +506,41 @@ legendre(int n, const float *coefs, float x)
 float*
 malloc_vector_f(size_t n) 
 {
+#ifdef USE_MKL
+    return (float *)malloc(n*sizeof(float));
+#else
     return fftwf_alloc_real(n);
+#endif
 }
 
 void
 free_vector_f(float* v)
 {
+#ifdef USE_MKL
+    free(v);
+#else
     fftwf_free(v);
+#endif
 }
 
 float _Complex*
 malloc_vector_c(size_t n) 
 {
+#ifdef USE_MKL
+    return (float _Complex*)malloc(n*sizeof(float _Complex));
+#else
     return fftwf_alloc_complex(n);
+#endif
 }
 
 void
 free_vector_c(float _Complex* v)
 {
+#ifdef USE_MKL
+    free(v);
+#else
     fftwf_free(v);
+#endif
 }
 
 
