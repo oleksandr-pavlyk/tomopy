@@ -57,7 +57,7 @@
 #endif
 #include <math.h>
 #include <string.h>
-#idfdef USE_MKL
+#ifdef USE_MKL
 #include <pthread.h>
 pthread_mutex_t lock;
 #endif
@@ -124,7 +124,7 @@ gridrec(
     MKL_LONG length_1d = pdim;
     MKL_LONG length_2d[2] = {pdim, pdim};
     DftiCreateDescriptor(&reverse_1d, DFTI_SINGLE, DFTI_COMPLEX, 1, pdim);
-    DftiCreateDescriptor(&reverse_2d, DFTI_SINGLE, DFTI_COMPLEX, 2, length_2d);
+    DftiCreateDescriptor(&forward_2d, DFTI_SINGLE, DFTI_COMPLEX, 2, length_2d);
 #else
     // Set up fftw plans
     fftwf_plan reverse_1d;
@@ -228,7 +228,7 @@ gridrec(
 
 #ifdef USE_MKL
             DftiComputeBackward(reverse_1d, sino);
-#endif
+#else
             // Take FFT of the projection array
             fftwf_execute(reverse_1d);
 #endif
@@ -376,7 +376,7 @@ gridrec(
     free_vector_f(work);
     free_matrix_c(H);
 #ifdef USE_MKL
-    DftiFreeDescriptor(&reverse1d);
+    DftiFreeDescriptor(&reverse_1d);
     DftiFreeDescriptor(&forward_2d);
 #else
     fftwf_destroy_plan(reverse_1d);
