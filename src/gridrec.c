@@ -123,7 +123,7 @@ gridrec(
     DFTI_DESCRIPTOR_HANDLE forward_2d;
     MKL_LONG length_1d = pdim;
     MKL_LONG length_2d[2] = {pdim, pdim};
-    DftiCreateDescriptor(&reverse_1d, DFTI_SINGLE, DFTI_COMPLEX, 1, pdim);
+    DftiCreateDescriptor(&reverse_1d, DFTI_SINGLE, DFTI_COMPLEX, 1, length_1d);
     DftiCreateDescriptor(&forward_2d, DFTI_SINGLE, DFTI_COMPLEX, 2, length_2d);
 #else
     // Set up fftw plans
